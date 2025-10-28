@@ -184,7 +184,7 @@ Then open 👉 [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🧠 9. Optional: Run All Services Together
+##  9. Optional: Run All Services Together
 
 You’ll need **4 terminals**:
 
@@ -197,7 +197,7 @@ You’ll need **4 terminals**:
 
 ---
 
-## 🔍 10. Troubleshooting
+##  10. Troubleshooting
 
 | Problem | Possible Fix |
 |----------|---------------|
@@ -240,10 +240,10 @@ npm start
 
 ```mermaid
 flowchart LR
-  A[React Frontend] --> B[Node.js Backend]
-  B --> C[(MySQL Database)]
-  B --> D[FastAPI (Python API)]
-  D --> E[Ollama LLM]
+  A["React Frontend"] --> B["Node.js Backend"]
+  B --> C["MySQL Database"]
+  B --> D["FastAPI (Python API)"]
+  D --> E["Ollama LLM"]
 ```
 
 ---
