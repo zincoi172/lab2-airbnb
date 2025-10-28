@@ -1,74 +1,255 @@
-<<<<<<< HEAD
-# data236-lab1
-=======
-# Getting Started with Create React App
+# 🏠 Airbnb-LAB1 Full Stack Setup Guide
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Welcome to the Airbnb-LAB1 project!  
+This document explains how to clone, configure, and run the **complete full-stack application** locally.
 
-## Available Scripts
+This README is for the **main branch** and explains how to run the complete Airbnb-Lab1 project,  
+including instructions for both frontend (`yianyao` branch) and backend (`feature/backend-yianyao` branch).
 
-In the project directory, you can run:
+This project includes three integrated components:
 
-### `npm start`
+1. **Frontend (React)** – branch: `yianyao`  
+2. **Backend (Node.js + Express + MySQL)** – branch: `feature/backend-yianyao`  
+3. **Python API (FastAPI)** – integrates with **Ollama LLM** for AI features  
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Project Overview
 
-### `npm test`
+```
+📦 Airbnb-LAB1
+ ┣ 📂 frontend/                ← branch: yianyao
+ ┃ ┣ 📂 src/
+ ┃ ┣ 📜 App.js
+ ┃ ┗ 📜 package.json
+ ┣ 📂 backend/                 ← branch: feature/backend-yianyao
+ ┃ ┣ 📂 server/
+ ┃ ┣ 📂 database/
+ ┃ ┣ 📂 src/
+ ┃ ┃ ┗ 📜 init-db.cjs
+ ┃ ┗ 📜 app.cjs
+ ┣ 📂 public/
+ ┣ 📜 README.md
+ ┗ 📜 docker-compose.yml (optional)
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+##  1. Clone the Repositories
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Since frontend and backend are on separate branches, clone both:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+# Clone frontend
+git clone -b yianyao https://github.com/<your-repo>.git frontend
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+# Clone backend
+git clone -b feature/backend-yianyao https://github.com/<your-repo>.git backend
+```
 
-### `npm run eject`
+Make sure both folders exist side by side in your workspace.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+---
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+##  2. Prerequisites
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Ensure you have installed:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- **Node.js (LTS)** and **npm**
+- **Python 3.10+** and **pip**
+- **MySQL 8.x** (running locally)
+- **Ollama** (local LLM runtime)
 
-## Learn More
+---
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+##  3. Install & Run Ollama
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Ollama provides local LLM serving for the Python API.
 
-### Code Splitting
+### Install Ollama
+- macOS:  
+  ```bash
+  brew install ollama
+  ```
+- Linux / Windows:  
+  [Download installer](https://ollama.com)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Start the Ollama service
+```bash
+ollama serve
+```
 
-### Analyzing the Bundle Size
+### Pull a model (example: Llama 3)
+```bash
+ollama pull llama3
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+###  Check Ollama Port
+By default, Ollama runs on port **11434**,  
+but your setup might be different (for example, **11500**).
 
-### Making a Progressive Web App
+To check which port Ollama is using, run:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```bash
+ps aux | grep ollama
+```
 
-### Advanced Configuration
+Then update your `.env` accordingly, for example:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```bash
+OLLAMA_HOST=http://localhost:11500
+OLLAMA_MODEL=llama3
+```
 
-### Deployment
+> Make sure the Python API and Node backend both point to the same Ollama host and port.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+---
 
-### `npm run build` fails to minify
+##  4. Python API (FastAPI)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
->>>>>>> de84f34 (Initialize project using Create React App)
+From your backend folder (where `main.py` exists):
+
+### Run the API
+```bash
+cd backend/server
+uvicorn main:app --reload --port 8001
+```
+
+Your FastAPI service will now be available at:  
+👉 `http://localhost:8001`
+
+---
+
+##  5. MySQL Database Setup
+
+Initialize MySQL database
+
+```bash
+cd backend/src/db
+node init-db.cjs
+```
+---
+
+##  6. Environment Variables
+
+Create a `.env` file in the **backend** directory:
+
+```bash
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=app_user
+MYSQL_PASSWORD=strong_password_here
+MYSQL_DATABASE=airbnb_lab
+
+# Ollama settings
+OLLAMA_HOST=http://localhost:11500
+OLLAMA_MODEL=llama3
+```
+
+Create a `.env` file in the **frontend** directory:
+
+```bash
+REACT_APP_API_URL=http://localhost:5000
+```
+
+> Update ports if needed.
+
+---
+
+##  7. Start the Node.js Backend
+
+From your backend folder:
+
+```bash
+cd backend
+npm install
+node src/app.cjs
+```
+
+The Node backend will start on port **4000** by default.
+
+---
+
+##  8. Start the React Frontend
+
+From your frontend folder:
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Then open 👉 [http://localhost:3000](http://localhost:3000)
+
+---
+
+## 🧠 9. Optional: Run All Services Together
+
+You’ll need **4 terminals**:
+
+| Terminal | Command | Description |
+|-----------|----------|-------------|
+| 1️⃣ | `ollama serve` | Start LLM server |
+| 2️⃣ | `uvicorn main:app --reload --port 8001` | Start FastAPI |
+| 3️⃣ | `node src/app.cjs` | Start Node backend |
+| 4️⃣ | `npm start` | Start React frontend |
+
+---
+
+## 🔍 10. Troubleshooting
+
+| Problem | Possible Fix |
+|----------|---------------|
+| `ollama: command not found` | Install Ollama (`brew install ollama`) |
+| `model not found` | Run `ollama pull llama3` |
+| `MySQL connection failed` | Check `.env` credentials and running MySQL |
+| `Port already in use` | Free it: `lsof -i :8001` |
+| `CORS error` | Verify frontend `.env` and API URLs |
+| `.env not loaded` | Ensure `dotenv` is imported in `app.cjs`:<br>```js<br>import dotenv from 'dotenv';<br>dotenv.config();<br>``` |
+
+---
+
+##  11. Typical Development Flow
+
+```bash
+# 1️⃣ Start Ollama
+ollama serve
+ollama pull llama3
+
+# 2️⃣ Start Python FastAPI
+cd backend/server
+uvicorn main:app --reload --port 8001
+
+# 3️⃣ Initialize MySQL database
+cd backend/src/db
+node init-db.cjs
+
+# 4️⃣ Start Node backend
+cd backend
+node src/app.cjs
+
+# 5️⃣ Start frontend
+cd frontend
+npm start
+```
+
+---
+
+##  12. System Architecture
+
+```mermaid
+flowchart LR
+  A[React Frontend] --> B[Node.js Backend]
+  B --> C[(MySQL Database)]
+  B --> D[FastAPI (Python API)]
+  D --> E[Ollama LLM]
+```
+
+---
+
+##  13. Learn More
+
+- **React Docs:** [https://react.dev](https://react.dev)  
+- **FastAPI Docs:** [https://fastapi.tiangolo.com](https://fastapi.tiangolo.com)  
+- **Ollama Docs:** [https://github.com/ollama/ollama](https://github.com/ollama/ollama)
