@@ -1,0 +1,17 @@
+.agent-fab{
+  position: fixed; right: 20px; bottom: 20px;
+  z-index: 1100; border: none; border-radius: 999px;
+  padding: 10px 16px; background: #ff385c; color: #fff; font-weight: 600;
+  box-shadow: 0 6px 16px rgba(0,0,0,.18);
+}
+.agent-fab:hover{ transform: translateY(-1px); }
+
+.agent-overlay{
+  position: fixed; inset: 0; z-index: 1090; background: rgba(0,0,0,.12);
+  display: flex; justify-content: flex-end;
+}
+.agent-drawer{
+  width: min(420px, 92vw); height: 100%; background: #fff; padding: 16px;
+  box-shadow: -4px 0 16px rgba(0,0,0,.15); overflow-y: auto;
+}
+.agent-form .form-label{ font-size: 12px; font-weight: 700; color: #555; }

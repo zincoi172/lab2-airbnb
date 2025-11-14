@@ -1,0 +1,84 @@
+.property-carousel {
+  margin-top: 1rem;
+}
+
+.carousel-scroll {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: .25rem;
+}
+
+.property-card {
+  width: 305px;             
+  flex: 0 0 auto;          
+  scroll-snap-align: start;
+  transition: transform .2s ease;
+}
+.property-card:hover { transform: translateY(-2px); }
+
+.img-wrap {
+  position: relative !important;
+  border-radius: 20px;
+  overflow: hidden !important;
+}
+
+.ratio-16x10::before {
+  content: "";
+  display: block;
+  padding-top: 62.5%;
+}
+
+.img-wrap img {
+  position: absolute;
+  inset: 0;
+  width: 70% !important;
+  object-fit: cover;
+  border-radius: 20px;
+  height: 100% !important;
+}
+
+.pill-badge {
+  position: absolute;
+  top: 12px; 
+  left: 12px;
+  background: #fff;
+  color: #111;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.12);
+}
+
+.fav-btn {
+  position: absolute;
+  top: 10px; 
+  right: 100px;
+  width: 32px; 
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,.96);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0,0,0,.12);
+  cursor: pointer;
+  transition: transform .12s ease;
+}
+
+.fav-btn:hover { transform: scale(1.07); }
+
+.fav-btn .heart path {
+  fill: none;
+  stroke: #222;
+  stroke-width: 1.8;
+  paint-order: stroke; 
+}
+
+.fav-btn.is-active .heart path {
+  fill: #ff385c;
+  stroke: #ff385c;
+}
+
+

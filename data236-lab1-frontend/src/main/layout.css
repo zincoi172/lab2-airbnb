@@ -1,0 +1,84 @@
+.navbar-brand img {
+    max-width: 150px; 
+    height: auto;  
+}
+
+nav{
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+}
+
+.font-weight-semibold { font-weight: 600; }
+
+.abnb-pill-search{
+  border:1px solid #ddd; border-radius:999px; background:#fff;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+  padding:8px 8px 8px 16px; gap:10px;
+}
+.abnb-pill-seg{ font-size:14px; }
+.abnb-pill-divider{ width:1px; height:20px; background:#e5e5e5; display:inline-block; }
+.abnb-pill-cta{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:32px; height:32px; border-radius:999px; background:#ff385c; margin-left:4px;
+}
+
+.abnb-profile-toggle{
+  border:1px solid #ddd; border-radius:999px; background:#fff;
+}
+.abnb-profile-toggle:hover{ box-shadow:0 2px 8px rgba(0,0,0,.08); }
+.abnb-avatar{
+  width:28px; height:28px; border-radius:50%; background:#717171; display:inline-block;
+}
+
+@media (max-width: 991.98px){
+}
+.abnb-search-pill {
+  padding: 15px 20px;
+  border: 1px solid #e5e5e5;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,.12);
+}
+
+.abnb-seg {
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px;
+  min-width: 150px;
+}
+
+.abnb-seg-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #222;
+}
+
+.abnb-seg-input {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: #444;
+}
+
+.abnb-seg-input::placeholder {
+  color: #999;
+}
+
+.abnb-divider {
+  width: 1px;
+  height: 32px;
+  background: #ddd;
+}
+
+.abnb-go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: #ff385c;
+  border: none;
+}
+

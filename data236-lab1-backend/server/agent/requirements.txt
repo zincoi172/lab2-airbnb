@@ -1,0 +1,11 @@
+# requirements.txt for AI Agent Service
+
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+requests==2.31.0
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# Optional: Add if you're using these
+# langchain==0.1.0
+# tavily-python==0.3.0

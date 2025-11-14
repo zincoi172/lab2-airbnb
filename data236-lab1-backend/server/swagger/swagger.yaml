@@ -1,0 +1,533 @@
+openapi: 3.0.3
+info:
+  title: Lab1 Airbnb API
+  version: "1.1.0"
+servers:
+  - url: http://localhost:4000
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: connect.sid
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        first_name: { type: string }
+        last_name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [traveler, owner] }
+        created_at: { type: string, format: date-time }
+
+    UserProfile:
+      type: object
+      properties:
+        user_id: { type: integer }
+        first_name: { type: string }
+        last_name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        about: { type: string }
+        city: { type: string }
+        state: { type: string, description: "2-letter code" }
+        country: { type: string }
+        gender: { type: string, enum: [female, male, non-binary, prefer_not_to_say] }
+        languages_json:
+          description: "JSON array of language codes"
+          type: array
+          items: { type: string }
+        avatar_url: { type: string }
+        updated_at: { type: string, format: date-time }
+
+    Property:
+      type: object
+      properties:
+        id: { type: integer }
+        owner_id: { type: integer }
+        type: { type: string, example: "apartment" }
+        title: { type: string }
+        location: { type: string }
+        description: { type: string }
+        price_per_night: { type: number, format: float }
+        bedrooms: { type: integer }
+        bathrooms: { type: integer }
+        guests: { type: integer }
+        amenities:
+          description: "JSON array of amenity names"
+          type: array
+          items: { type: string }
+        rating: { type: number, format: float, nullable: true }
+        photo_urls:
+          description: "JSON array of photo URLs"
+          type: array
+          items: { type: string, format: uri }
+        created_at: { type: string, format: date-time }
+
+    Booking:
+      type: object
+      properties:
+        id: { type: integer }
+        traveler_id: { type: integer }
+        property_id: { type: integer }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        guests: { type: integer }
+        status: { type: string, enum: [PENDING, ACCEPTED, CANCELLED] }
+        created_at: { type: string, format: date-time }
+
+    Blocks:
+      type: array
+      items:
+        type: object
+        properties:
+          title: { type: string }
+          summary: { type: string }
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200": { description: OK }
+
+  /api/auth/signup:
+    post:
+      summary: Sign up (creates session)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name, email, password, role]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+                role: { type: string, enum: [traveler, owner] }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: "#/components/schemas/User" }
+
+  /api/auth/login:
+    post:
+      summary: Login (creates session)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200": { description: OK }
+
+  /api/auth/logout:
+    post:
+      summary: Logout (destroys session)
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200": { description: OK }
+
+  /api/auth/me:
+    get:
+      summary: Current user
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: "#/components/schemas/User" }
+
+  /api/traveler/favorites:
+    get:
+      summary: List favorites (traveler)
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Property" }
+    post:
+      summary: Add favorite (traveler)
+      security: [ { cookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [property_id]
+              properties:
+                property_id: { type: integer }
+      responses:
+        "201": { description: Created }
+
+  /api/traveler/favorites/{propertyId}:
+    delete:
+      summary: Remove favorite (traveler)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: propertyId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /api/traveler/dashboard:
+    get:
+      summary: Traveler dashboard
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200": { description: OK }
+
+  /api/owner/dashboard:
+    get:
+      summary: Owner dashboard
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200": { description: OK }
+
+  /api/owner/properties:
+    post:
+      summary: Create property (owner)
+      security: [ { cookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, title, location, price_per_night]
+              properties:
+                type: { type: string }
+                title: { type: string }
+                location: { type: string }
+                description: { type: string }
+                price_per_night: { type: number, format: float }
+                bedrooms: { type: integer }
+                bathrooms: { type: integer }
+                guests: { type: integer }
+                amenities:
+                  type: array
+                  items: { type: string }
+                photo_urls:
+                  type: array
+                  items: { type: string, format: uri }
+      responses:
+        "201": { description: Created }
+
+  /api/owner/properties/{id}:
+    put:
+      summary: Update property (owner)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type: { type: string }
+                title: { type: string }
+                location: { type: string }
+                description: { type: string }
+                price_per_night: { type: number, format: float }
+                bedrooms: { type: integer }
+                bathrooms: { type: integer }
+                guests: { type: integer }
+                amenities:
+                  type: array
+                  items: { type: string }
+                photo_urls:
+                  type: array
+                  items: { type: string, format: uri }
+      responses:
+        "200": { description: OK }
+    delete:
+      summary: Delete property (owner)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /api/traveler/bookings:
+    get:
+      summary: List bookings for traveler
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Booking" }
+    post:
+      summary: Create booking (traveler)
+      security: [ { cookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [property_id, start_date, end_date]
+              properties:
+                property_id: { type: integer }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                guests: { type: integer }
+      responses:
+        "201": { description: Created }
+
+  /api/traveler/bookings/{id}/cancel:
+    post:
+      summary: Cancel booking (traveler)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /api/owner/bookings:
+    get:
+      summary: List bookings for owner
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Booking" }
+
+  /api/owner/bookings/{id}/accept:
+    post:
+      summary: Accept booking (owner)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /api/owner/bookings/{id}/cancel:
+    post:
+      summary: Cancel booking (owner)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /api/agent/plan:
+    post:
+      summary: Generate AI itinerary and recs
+      description: Proxies to Python FastAPI concierge service.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                booking:
+                  type: object
+                  properties:
+                    booking_id: { type: integer }
+                    location:   { type: string }
+                    start_date: { type: string, format: date }
+                    end_date:   { type: string, format: date }
+                    guests:     { type: integer }
+                preferences:
+                  type: object
+                  properties:
+                    budget:          { type: string, enum: [low, mid, high] }
+                    interests:       { type: array, items: { type: string } }
+                    mobility_needs:  { type: string }
+                    dietary_filters: { type: array, items: { type: string } }
+                    party_type:      { type: string, enum: [family, couple, solo, friends] }
+      responses:
+        "200":
+          description: Concierge suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plan:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date: { type: string }
+                        morning:
+                          type: array
+                          items: { type: object, properties: { title: {type:string}, summary: {type:string} } }
+                        afternoon: { $ref: '#/components/schemas/Blocks' }
+                        evening:   { $ref: '#/components/schemas/Blocks' }
+                  activities:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title: { type: string }
+                        address: { type: string }
+                        geo: { type: string }
+                        price_tier: { type: string }
+                        duration_minutes: { type: integer }
+                        tags: { type: array, items: { type: string } }
+                  restaurants:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        address: { type: string }
+                        cuisine: { type: string }
+                        price_tier: { type: string }
+                        dietary_flags: { type: array, items: { type: string } }
+                  packing_checklist:
+                    type: array
+                    items: { type: string }
+
+  /api/profile:
+    get:
+      summary: Get current user profile
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+    put:
+      summary: Update current user profile
+      security: [ { cookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfile'
+      responses:
+        "200":
+          description: OK
+
+  /api/profile/avatar:
+    post:
+      summary: Upload profile picture
+      security: [ { cookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Avatar uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  avatar_url: { type: string }
+
+  /api/properties/{id}:
+    get:
+      summary: Get property details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+
+  /api/properties/search:
+    get:
+      summary: Search properties
+      description: Search available properties by location, startDate, endDate.
+      parameters:
+        - in: query
+          name: location
+          schema:
+            type: string
+          required: false
+          description: Location to search for
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+          required: false
+          description: Desired booking start date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+          required: false
+          description: Desired booking end date
+      responses:
+        "200":
+          description: List of matching properties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Property'

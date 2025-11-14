@@ -1,0 +1,30 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Express + MySQL API for Data236 Lab1",
+  "private": true,
+  "type": "commonjs",
+  "main": "src/app.cjs",
+  "scripts": {
+    "dev": "nodemon src/app.cjs",
+    "start": "node src/app.cjs",
+    "db:init": "node src/dev/init-db.cjs",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "mysql2": "^3.15.1",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
