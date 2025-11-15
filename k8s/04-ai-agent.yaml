@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-agent
+  namespace: airbnb-app
+  labels:
+    app: ai-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-agent
+  template:
+    metadata:
+      labels:
+        app: ai-agent
+    spec:
+      containers:
+      - name: ai-agent
+        image: lab2-airbnb-ai-agent:latest
+        imagePullPolicy: Never  # Use local image from docker-compose build
+        ports:
+        - containerPort: 11500
+          name: http
+        env:
+        - name: OLLAMA_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: airbnb-config
+              key: OLLAMA_HOST
+        - name: OLLAMA_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: airbnb-config
+              key: OLLAMA_MODEL
+        - name: TAVILY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: airbnb-secrets
+              key: TAVILY_API_KEY
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 11500
+          initialDelaySeconds: 60
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 11500
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-agent-service
+  namespace: airbnb-app
+  labels:
+    app: ai-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: ai-agent
+  ports:
+  - port: 11500
+    targetPort: 11500
+    protocol: TCP
+    name: http

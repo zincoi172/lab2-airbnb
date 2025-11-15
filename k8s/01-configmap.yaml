@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airbnb-config
+  namespace: airbnb-app
+data:
+  # Backend configuration
+  NODE_ENV: "production"
+  PORT: "4000"
+  MYSQL_HOST: "host.docker.internal"
+  MYSQL_PORT: "3306"
+  MYSQL_DB: "airbnb_lab"
+  AI_AGENT_URL: "http://ai-agent-service:11500"
+  
+  # AI Agent configuration
+  OLLAMA_HOST: "http://localhost:11434"
+  OLLAMA_MODEL: "llama3"
+  
+  # Frontend configuration
+  REACT_APP_API_URL: "http://localhost:4000"
