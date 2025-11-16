@@ -3,6 +3,7 @@
 const { Router } = require("express");
 const { pool } = require("../db/pool.cjs");
 const { requireAuth, requireRole } = require("../middleware/requireAuth.cjs");
+const producerService = require('../producer-service.cjs');
 
 const router = Router();
 
@@ -32,6 +33,15 @@ router.post("/:id/accept", requireAuth, requireRole("owner"), async (req, res) =
     [id, req.session.user.id]
   );
   if (!r.affectedRows) return res.status(404).json({ error: "Not found or not your booking" });
+
+  // 🔥 Send booking update to Kafka
+  await producerService.publishBookingUpdate(
+    id,
+    'accepted',
+    req.session.user.id,
+    'Booking accepted by owner'
+  );
+
   res.json({ id, status: "ACCEPTED" });
 });
 
@@ -51,6 +61,15 @@ router.post("/:id/cancel", requireAuth, requireRole("owner"), async (req, res) =
     [id, u.id]
   );
   if (!r.affectedRows) return res.status(404).json({ error: "Not found or no permission" });
+
+  // 🔥 Send booking update to Kafka
+  await producerService.publishBookingUpdate(
+    id,
+    '',
+    req.session.user.id,
+    'Booking cancelled by owner'
+  );
+
   res.json({ id, status: "CANCELLED" });
 });
 

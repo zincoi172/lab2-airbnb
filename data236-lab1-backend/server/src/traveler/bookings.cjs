@@ -3,6 +3,7 @@
 const { Router } = require("express");
 const { pool } = require("../db/pool.cjs");
 const { requireAuth, requireRole } = require("../middleware/requireAuth.cjs");
+const producerService = require('../producer-service.cjs');
 
 const router = Router();
 
@@ -12,13 +13,37 @@ router.post("/", requireAuth, requireRole("traveler"), async (req, res) => {
   if (!property_id || !start_date || !end_date)
     return res.status(400).json({ error: "property_id, start_date, end_date required" });
 
+  // Get property details to find owner_id
+  const [property] = await pool.query(
+    'SELECT owner_id, price_per_night FROM properties WHERE id = ?',
+    [property_id]
+  );
+  
+  if (!property.length) {
+    return res.status(404).json({ error: "Property not found" });
+  }
+
   // A booking starts in PENDING status until the Owner responds
   const [r] = await pool.query(
     `INSERT INTO bookings (traveler_id, property_id, start_date, end_date, guests, status)
      VALUES (?,?,?,?,?, 'PENDING')`,
     [req.session.user.id, property_id, start_date, end_date, guests]
   );
-  res.status(201).json({ id: r.insertId, status: "PENDING" });
+
+  const bookingId = r.insertId;
+
+  // 🔥 Send booking request to Kafka
+  await producerService.publishBookingRequest({
+    booking_id: bookingId,
+    property_id: property_id,
+    traveler_id: req.session.user.id,
+    owner_id: property[0].owner_id,
+    start_date: start_date,
+    end_date: end_date,
+    total_price: property[0].price_per_night * guests,
+  });
+
+  res.status(201).json({ id: bookingId, status: "PENDING" });
 });
 
 // Travelers can view Pending/Accepted/Cancelled bookings

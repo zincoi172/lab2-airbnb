@@ -13,6 +13,10 @@ require("dotenv").config();
 const { pool } = require("./db/pool.cjs");
 const { requireAuth } = require("./middleware/requireAuth.cjs");
 
+// Kafka services
+const producerService = require('./producer-service.cjs');
+const consumerService = require('./consumer-service.cjs');
+
 const app = express();
 
 // middleware
@@ -73,4 +77,46 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 
 // start
 const port = process.env.PORT || 4000;
-app.listen(port, () => console.log(`API on http://localhost:${port}`));
+app.listen(port, () => {
+  console.log(`API on http://localhost:${port}`);
+  
+  // Initialize Kafka after server starts
+  initKafka();
+});
+
+// Initialize Kafka Producer and Consumer
+async function initKafka() {
+  try {
+    console.log('🚀 Initializing Kafka services...');
+    
+    // Start producer (for sending messages)
+    await producerService.initProducer();
+    
+    // Pass database connection to consumer
+    consumerService.setDatabase(pool);
+    
+    // Start consumer (for receiving messages)
+    await consumerService.initConsumer();
+    
+    console.log('✅ Kafka services initialized successfully');
+  } catch (error) {
+    console.error('❌ Error initializing Kafka:', error);
+    // Continue running even if Kafka fails (for development)
+    console.log('⚠️  Server will continue without Kafka');
+  }
+}
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM signal received: closing connections...');
+  await producerService.disconnectProducer();
+  await consumerService.disconnectConsumer();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT signal received: closing connections...');
+  await producerService.disconnectProducer();
+  await consumerService.disconnectConsumer();
+  process.exit(0);
+});

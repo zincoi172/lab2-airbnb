@@ -5,6 +5,7 @@ metadata:
   namespace: airbnb-app
   labels:
     app: backend
+    role: producer-consumer
 spec:
   replicas: 2
   selector:
@@ -14,11 +15,12 @@ spec:
     metadata:
       labels:
         app: backend
+        role: producer-consumer
     spec:
       containers:
       - name: backend
         image: lab2-airbnb-backend:latest
-        imagePullPolicy: Never  # Use local image from docker-compose build
+        imagePullPolicy: Never
         ports:
         - containerPort: 4000
           name: http
@@ -53,6 +55,8 @@ spec:
             configMapKeyRef:
               name: airbnb-config
               key: AI_AGENT_URL
+        - name: KAFKA_BROKERS
+          value: "kafka-service:9092"
         - name: MYSQL_USER
           valueFrom:
             secretKeyRef:
