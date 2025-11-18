@@ -65,7 +65,7 @@ router.post("/:id/cancel", requireAuth, requireRole("owner"), async (req, res) =
   // 🔥 Send booking update to Kafka
   await producerService.publishBookingUpdate(
     id,
-    '',
+    'cancelled',
     req.session.user.id,
     'Booking cancelled by owner'
   );

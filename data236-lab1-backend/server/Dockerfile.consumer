@@ -1,0 +1,18 @@
+# Dockerfile for Consumer Service
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# No port needed (worker process)
+
+# Start consumer worker
+CMD ["node", "src/worker-consumer.cjs"]
