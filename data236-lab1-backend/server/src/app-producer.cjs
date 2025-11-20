@@ -2,6 +2,7 @@
 // Producer Service - Frontend-facing API that publishes to Kafka
 const express = require("express");
 const session = require("express-session");
+const MongoStore = require("connect-mongo");
 const cors = require("cors");
 const morgan = require("morgan");
 const path = require("path");
@@ -11,7 +12,7 @@ const axios = require("axios");
 const swaggerDoc = YAML.load(path.join(__dirname, "../swagger/swagger.yaml"));
 
 require("dotenv").config();
-const { pool } = require("./db/pool.cjs");
+const { connectMongoDB } = require("./db/mongodb.cjs");
 const { requireAuth } = require("./middleware/requireAuth.cjs");
 
 // Kafka Producer only
@@ -23,12 +24,27 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(morgan("dev"));
+
+// MongoDB Session Store
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "dev",
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: true, sameSite: "lax", secure: false, maxAge: 1000 * 60 * 60 * 24 },
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI || 'mongodb://admin:mongopassword123@mongodb-service:27017/airbnb_lab?authSource=admin',
+      dbName: 'airbnb_lab',
+      collectionName: 'sessions',
+      ttl: 24 * 60 * 60, // 1 day
+      autoRemove: 'native',
+      touchAfter: 24 * 3600,
+    }),
+    cookie: { 
+      httpOnly: true, 
+      sameSite: "lax", 
+      secure: false, 
+      maxAge: 1000 * 60 * 60 * 24 
+    },
   })
 );
 
@@ -40,8 +56,10 @@ app.get("/health", (_req, res) =>
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.get("/db-check", async (_req, res) => {
   try {
-    const [rows] = await pool.query("SELECT NOW() AS now");
-    res.json(rows[0]);
+    const { getDB } = require("./db/mongodb.cjs");
+    const db = getDB();
+    const result = await db.admin().serverStatus();
+    res.json({ ok: true, mongodb: result.version });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -77,12 +95,24 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 
 // start
 const port = process.env.PORT || 4000;
-app.listen(port, () => {
-  console.log(`🌐 Producer API on http://localhost:${port}`);
-  
-  // Initialize Kafka Producer only
-  initKafkaProducer();
-});
+
+async function startServer() {
+  try {
+    // Connect to MongoDB first
+    await connectMongoDB();
+    
+    app.listen(port, () => {
+      console.log(`🌐 Producer API on http://localhost:${port}`);
+      console.log(`🗄️  Connected to MongoDB`);
+      
+      // Initialize Kafka Producer
+      initKafkaProducer();
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
 
 // Initialize Kafka Producer
 async function initKafkaProducer() {
@@ -108,3 +138,6 @@ process.on('SIGINT', async () => {
   await producerService.disconnectProducer();
   process.exit(0);
 });
+
+// Start the server
+startServer();

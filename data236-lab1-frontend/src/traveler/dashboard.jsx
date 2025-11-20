@@ -51,7 +51,7 @@ function TravelerDashboard() {
             return typeof first === "string" ? first : first?.url || "https://via.placeholder.com/640x400?text=No+photo";
         };
         const normalized = (Array.isArray(data) ? data : []).map((p) => ({
-          id: p.id,
+          id: p._id || p.id,  // ← FIXED: Try _id first, then fallback to id
           name: p.title || "Untitled", 
           type: p.type,
           price: p.price_per_night != null ? Number(p.price_per_night) : 0,
@@ -154,4 +154,3 @@ function TravelerDashboard() {
 }
 
 export default TravelerDashboard;
-

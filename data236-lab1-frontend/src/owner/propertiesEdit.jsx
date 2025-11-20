@@ -8,6 +8,8 @@ function PropertyForm() {
   const { id } = useParams();
   const editing = !!id;
 
+  console.log("PropertyForm - ID from params:", id); // DEBUG
+
   const [form, setForm] = useState({
     title: "",
     type: "Entire Home",
@@ -17,16 +19,21 @@ function PropertyForm() {
     description: "",
     amenities: [],
     location: { city: "", state: "", country: "United States" },
-    photo_urls: [], // keep existing photos here (array of {url,key} or string url)
+    photo_urls: [],
   });
 
-  const [files, setFiles] = useState([]);     // new files to upload
-  const [previews, setPreviews] = useState([]); // previews for newly picked files
+  const [files, setFiles] = useState([]);
+  const [previews, setPreviews] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // --- helpers ---
   function parseLocation(loc) {
     if (!loc) return { city: "", state: "", country: "United States" };
-    if (typeof loc === "object") return { city: loc.city || "", state: (loc.state || "").toUpperCase().slice(0,2), country: loc.country || "United States" };
+    if (typeof loc === "object") return { 
+      city: loc.city || "", 
+      state: (loc.state || "").toUpperCase().slice(0,2), 
+      country: loc.country || "United States" 
+    };
     try {
       const o = JSON.parse(loc);
       return {
@@ -41,7 +48,6 @@ function PropertyForm() {
 
   function normalizePhotos(arr) {
     if (!Array.isArray(arr)) return [];
-    // allow both ["url", ...] or [{url,key}, ...]
     return arr.map((p) =>
       typeof p === "string" ? { url: p, key: null } : { url: p.url, key: p.key ?? null }
     );
@@ -68,26 +74,60 @@ function PropertyForm() {
 
   // --- load when editing ---
   useEffect(() => {
-    if (!editing) return;
+    if (!editing) {
+      console.log("Not editing, skipping load");
+      return;
+    }
+
+    if (!id || id === "undefined") {
+      console.error("Invalid property ID:", id);
+      alert("Invalid property ID. Redirecting to dashboard.");
+      nav("/owner/dashboard");
+      return;
+    }
+
+    console.log("Loading property with ID:", id);
+    setLoading(true);
+
     (async () => {
-      const { data } = await axios.get(
-        `http://localhost:4000/api/owner/properties/${id}`,
-        { withCredentials: true }
-      );
-      if (!data) return;
-      setForm({
-        title: data.title || "",
-        type: data.type || "Entire Home",
-        price_per_night: data.price_per_night != null ? Number(data.price_per_night) : 0,
-        bedrooms: data.bedrooms ?? 0,
-        bathrooms: data.bathrooms ?? 0,
-        description: data.description || "",
-        amenities: Array.isArray(data.amenities) ? data.amenities : [],
-        location: parseLocation(data.location),
-        photo_urls: normalizePhotos(data.photo_urls),
-      });
+      try {
+        const { data } = await axios.get(
+          `http://localhost:4000/api/owner/properties/${id}`,
+          { withCredentials: true }
+        );
+        
+        console.log("Loaded property data:", data);
+
+        if (!data) {
+          throw new Error("No property data returned");
+        }
+
+        setForm({
+          title: data.title || "",
+          type: data.type || "Entire Home",
+          price_per_night: data.price_per_night != null ? Number(data.price_per_night) : 0,
+          bedrooms: data.bedrooms ?? 0,
+          bathrooms: data.bathrooms ?? 0,
+          description: data.description || "",
+          amenities: Array.isArray(data.amenities) ? data.amenities : [],
+          location: parseLocation(data.location),
+          photo_urls: normalizePhotos(data.photo_urls),
+        });
+      } catch (err) {
+        console.error("Error loading property:", err);
+        if (err.response?.status === 403) {
+          alert("You don't have permission to edit this property. Please log in again.");
+        } else if (err.response?.status === 404) {
+          alert("Property not found.");
+        } else {
+          alert("Failed to load property: " + (err.response?.data?.message || err.message));
+        }
+        nav("/owner/dashboard");
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, [editing, id]);
+  }, [editing, id, nav]);
 
   // --- handlers ---
   function onChange(e) {
@@ -98,7 +138,6 @@ function PropertyForm() {
   function onPickFiles(e) {
     const selected = Array.from(e.target.files || []);
     setFiles(selected);
-    // revoke old previews to avoid memory leak
     previews.forEach((url) => URL.revokeObjectURL(url));
     const urls = selected.map((file) => URL.createObjectURL(file));
     setPreviews(urls);
@@ -107,15 +146,22 @@ function PropertyForm() {
   async function onSubmit(e) {
     e.preventDefault();
 
+    if (editing && (!id || id === "undefined")) {
+      alert("Invalid property ID");
+      return;
+    }
+
     try {
-      // 1) upload newly picked files (if any)
+      setLoading(true);
+
+      // 1) upload newly picked files
       const newlyUploaded = files.length ? await uploadToCloudinary(files) : [];
 
-      // 2) merge existing + new photos into final array of {url,key}
+      // 2) merge existing + new photos
       const existing = normalizePhotos(form.photo_urls);
       const photo_urls = [...existing, ...newlyUploaded];
 
-      // 3) build payload with backend field names
+      // 3) build payload
       const payload = {
         title: form.title,
         type: form.type,
@@ -124,30 +170,59 @@ function PropertyForm() {
         bathrooms: Number(form.bathrooms),
         description: form.description,
         amenities: form.amenities,
-        location: JSON.stringify(form.location), // backend stores string
-        photo_urls, // array of {url,key}
-        // guests not shown in form; backend has default 1
+        location: JSON.stringify(form.location),
+        photo_urls,
       };
 
+      console.log("Submitting payload:", payload);
+
       if (editing) {
+        console.log("PUT to:", `http://localhost:4000/api/owner/properties/${id}`);
         await axios.put(
           `http://localhost:4000/api/owner/properties/${id}`,
           payload,
-          { withCredentials: true, headers: { "Content-Type": "application/json" } }
+          { 
+            withCredentials: true, 
+            headers: { "Content-Type": "application/json" } 
+          }
         );
       } else {
+        console.log("POST to:", "http://localhost:4000/api/owner/properties");
         await axios.post(
           "http://localhost:4000/api/owner/properties",
           payload,
-          { withCredentials: true, headers: { "Content-Type": "application/json" } }
+          { 
+            withCredentials: true, 
+            headers: { "Content-Type": "application/json" } 
+          }
         );
       }
 
+      alert("Property saved successfully!");
       nav("/owner/dashboard");
     } catch (err) {
-      console.error(err);
-      alert("Failed to save property. Please try again.");
+      console.error("Save error:", err);
+      console.error("Error response:", err.response?.data);
+      
+      if (err.response?.status === 403) {
+        alert("You don't have permission to edit this property. Please log in again.");
+      } else {
+        alert("Failed to save property: " + (err.response?.data?.message || err.message));
+      }
+    } finally {
+      setLoading(false);
     }
+  }
+
+  if (loading && editing) {
+    return (
+      <div className="bg-white min-vh-100">
+        <Layout />
+        <main className="container py-4">
+          <p>Loading property...</p>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -160,15 +235,18 @@ function PropertyForm() {
             <a className="btn btn-outline-secondary" href="/owner/profile#properties">
               Cancel
             </a>
-            <button className="btn btn-dark" onClick={onSubmit}>
-              Save
+            <button 
+              className="btn btn-dark" 
+              onClick={onSubmit}
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
 
         <div className="row g-3">
           <div className="col-md-8">
-            {/* title (backend) */}
             <label className="form-label">Property name</label>
             <input
               className="form-control mb-3"
@@ -186,7 +264,7 @@ function PropertyForm() {
               onChange={onChange}
             />
 
-            {/* existing photos (read-only thumbnails) */}
+            {/* existing photos */}
             {form.photo_urls?.length > 0 && (
               <>
                 <div className="form-label">Existing photos</div>
@@ -233,7 +311,6 @@ function PropertyForm() {
               </>
             )}
 
-
             {/* pick new photos */}
             <label className="form-label">Add photos</label>
             <input className="form-control" type="file" multiple onChange={onPickFiles} />
@@ -272,7 +349,6 @@ function PropertyForm() {
               <option>Shared Room</option>
             </select>
 
-            {/* price_per_night (backend) */}
             <label className="form-label">Price (per night)</label>
             <input
               className="form-control mb-3"

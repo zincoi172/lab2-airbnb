@@ -27,14 +27,19 @@ function OwnerProperties() {
           withCredentials: true
         });
 
+        console.log("Raw property data:", data.myProperties);
+
         const normalized = (data.myProperties || []).map(p => {
           const photos = Array.isArray(p.photo_urls) ? p.photo_urls : [];
           const firstUrl = photos.length
             ? (typeof photos[0] === "string" ? photos[0] : photos[0].url)
             : "https://via.placeholder.com/192x192?text=No+photo";
 
+          const propertyId = p.id || p._id || p.property_id;
+          console.log("Property ID:", propertyId);
+
           return {
-            id: p.id,
+            id: propertyId,
             name: p.title || "Untitled",
             type: p.type,
             price: p.price_per_night != null ? Number(p.price_per_night) : 0,
@@ -47,6 +52,8 @@ function OwnerProperties() {
         });
 
         setList(normalized);
+      } catch(err) {
+        console.error("Error loading properties:", err);
       } finally {
         setLoading(false);
       }
@@ -72,7 +79,7 @@ function OwnerProperties() {
 
       {list.length === 0 && (
         <div className="card p-4 d-flex align-items-center justify-content-center" style={{ borderRadius: 12 }}>
-          <p className="text-muted mb-2">You don’t have any properties yet.</p>
+          <p className="text-muted mb-2">You don't have any properties yet.</p>
           <a href="/owner/properties/new" className="btn btn-dark rounded-pill px-4">
             Create your first listing
           </a>
@@ -96,10 +103,10 @@ function OwnerProperties() {
               <div className="flex-grow-1">
                 <h5 className="mb-1">{p.name}</h5>
                 <div className="text-muted small">
-                  {p.type} ・ ${p.price}/night
-                  {p.bedrooms != null && ` ・ ${p.bedrooms} bd`}
-                  {p.bathrooms != null && ` ・ ${p.bathrooms} ba`}
-                  {p.locationText && ` ・ ${p.locationText}`}
+                  {p.type} · ${p.price}/night
+                  {p.bedrooms != null && ` · ${p.bedrooms} bd`}
+                  {p.bathrooms != null && ` · ${p.bathrooms} ba`}
+                  {p.locationText && ` · ${p.locationText}`}
                 </div>
                 {!!(p.amenities?.length) && (
                   <div className="text-muted small mt-1">
@@ -113,6 +120,9 @@ function OwnerProperties() {
                 <a
                   href={`/owner/properties/${p.id}/edit`}
                   className="btn btn-outline-secondary rounded-pill px-4"
+                  onClick={(e) => {
+                    console.log("Navigating to edit with ID:", p.id);
+                  }}
                 >
                   Edit
                 </a>
@@ -126,3 +136,4 @@ function OwnerProperties() {
 }
 
 export default OwnerProperties;
+

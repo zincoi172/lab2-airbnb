@@ -93,7 +93,7 @@ export default function PastTrips() {
                 { onAuthFail: () => nav("/") }
               );
               prop = {
-                id: p.id,
+                id: p._id || p.id,
                 name: p.title || "Listing",
                 price_per_night: p.price_per_night != null ? Number(p.price_per_night) : null,
                 image: firstImage(p.photo_urls),
@@ -108,7 +108,7 @@ export default function PastTrips() {
             const total = Math.round((subtotal + taxes) * 100) / 100;
 
             return {
-              id: b.id,
+              id: b._id || b.id,
               property_id: b.property_id,
               status: toTitleCaseStatus(b.status),
               checkin: b.start_date,

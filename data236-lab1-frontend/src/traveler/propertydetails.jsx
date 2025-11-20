@@ -27,7 +27,7 @@ function normalizeProperty(p) {
       : [];
 
   return {
-    id: p.id,
+    id: p._id || p.id,
     name: p.title || "Untitled",
     type: p.type,
     price: p.price_per_night != null ? Number(p.price_per_night) : 0,

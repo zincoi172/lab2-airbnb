@@ -50,7 +50,7 @@ export default function BookingRequest() {
         const p = await res.json();
 
         const normalized = {
-          id: p.id,
+          id: p._id || p.id,  // ← FIXED: Try _id first, then fallback to id
           name: p.title || "Untitled",
           price: p.price_per_night != null ? Number(p.price_per_night) : 0,
           image: toFirstImage(p.photo_urls),
@@ -82,7 +82,7 @@ export default function BookingRequest() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          property_id: Number(id),
+          property_id: id,  // ← Use id directly (it's already a string from URL params)
           start_date: checkin,
           end_date: checkout,
           guests,

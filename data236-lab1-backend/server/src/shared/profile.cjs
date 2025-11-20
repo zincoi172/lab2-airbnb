@@ -1,10 +1,21 @@
-
 const { Router } = require("express");
-const { pool } = require("../db/pool.cjs");
+const { getDB } = require("../db/mongodb.cjs");
+const { ObjectId } = require("mongodb");
 const { requireAuth } = require("../middleware/requireAuth.cjs");
 const router = Router();
 const multer = require("multer");
 const path = require("path");
+
+// Helper to safely convert to ObjectId
+function toObjectId(id) {
+  if (!id) return null;
+  if (id instanceof ObjectId) return id;
+  if (typeof id === 'string' && ObjectId.isValid(id)) {
+    return new ObjectId(id);
+  }
+  return id;
+}
+
 const upload = multer({
   dest: path.join(__dirname, "../../public/avatars"),
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
@@ -16,48 +27,77 @@ const upload = multer({
   },
 });
 
-// POST /api/profile/avatar - upload profile picture for both traveler and owner
-// The frontend should send a multipart/form-data POST request 
-// to /api/profile/avatar with the file field named avatar
+// POST /api/profile/avatar - upload profile picture
 router.post("/avatar", requireAuth, upload.single("avatar"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  const userId = req.session.user.id;
-  // Save the file path (relative to public) in avatar_url
-  const avatarUrl = `/avatars/${req.file.filename}`;
-  await pool.query("UPDATE user_profiles SET avatar_url = ? WHERE user_id = ?", [avatarUrl, userId]);
-  res.json({ avatar_url: avatarUrl });
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    
+    const userId = req.session.user.id;
+    const avatarUrl = `/avatars/${req.file.filename}`;
+    
+    const db = getDB();
+    await db.collection('user_profiles').updateOne(
+      { user_id: toObjectId(userId) },
+      { $set: { avatar_url: avatarUrl } }
+    );
+    
+    res.json({ avatar_url: avatarUrl });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
 });
-// Note that both traveler and owner can use the same logic for Profile Management or Profile Page
-// The Frontend can decide which fields to show/edit based on the role
-// The only difference is the Owner Add/edit with details(
-// property name, type, amentities, pricing, bedrooms, bathrooms, avalability) 
-// Where we placed it in owner/properties.cjs
 
 // GET /api/profile - get current user's profile
 router.get("/", requireAuth, async (req, res) => {
-  const userId = req.session.user.id;
-  const role = (req.session.user?.role || "").toLowerCase();
-  const [rows] = await pool.query("SELECT * FROM user_profiles WHERE user_id = ?", [userId]);
-  if (!rows.length) return res.status(404).json({ error: "Profile not found" });
-  res.json({ ...rows[0], role});
+  try {
+    const userId = req.session.user.id;
+    const role = (req.session.user?.role || "").toLowerCase();
+    
+    const db = getDB();
+    const profile = await db.collection('user_profiles').findOne({ 
+      user_id: toObjectId(userId)
+    });
+    
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    
+    res.json({ ...profile, role });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // PUT /api/profile - update current user's profile
 router.put("/", requireAuth, async (req, res) => {
-  const userId = req.session.user.id;
-  const fields = ["first_name", "last_name", "email", "phone", "about", "city", "state", "country", "gender", "languages_json", "avatar_url"];
-  const updates = [];
-  const params = [];
-  for (const f of fields) {
-    if (req.body?.[f] !== undefined) {
-      updates.push(`${f} = ?`);
-      params.push(f === "languages_json" ? JSON.stringify(req.body[f]) : req.body[f]);
+  try {
+    const userId = req.session.user.id;
+    const fields = ["first_name", "last_name", "email", "phone", "about", "city", "state", "country", "gender", "languages_json", "avatar_url"];
+    
+    const updates = {};
+    for (const f of fields) {
+      if (req.body?.[f] !== undefined) {
+        updates[f] = f === "languages_json" ? JSON.stringify(req.body[f]) : req.body[f];
+      }
     }
+    
+    if (Object.keys(updates).length === 0) {
+      return res.json({ ok: true });
+    }
+    
+    const db = getDB();
+    await db.collection('user_profiles').updateOne(
+      { user_id: toObjectId(userId) },
+      { $set: updates }
+    );
+    
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
   }
-  if (!updates.length) return res.json({ ok: true });
-  params.push(userId);
-  await pool.query(`UPDATE user_profiles SET ${updates.join(", ")} WHERE user_id = ?`, params);
-  res.json({ ok: true });
 });
 
 module.exports = router;

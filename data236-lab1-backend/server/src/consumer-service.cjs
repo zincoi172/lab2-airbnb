@@ -1,8 +1,10 @@
 // consumer-service.cjs
 // Backend Services - Consumes Kafka messages and processes bookings
-// Place at: data236-lab1-backend/server/src/consumer-service.cjs
+// MongoDB version
 
 const { Kafka } = require('kafkajs');
+const { getDB } = require('./db/mongodb.cjs');
+const { ObjectId } = require('mongodb');
 
 const kafka = new Kafka({
   clientId: 'airbnb-consumer',
@@ -18,14 +20,6 @@ const TOPICS = {
   TRAVELER_NOTIFICATIONS: 'traveler-notifications',
 };
 
-// Store for database connection (will be injected)
-let dbPool = null;
-
-// Set database connection
-function setDatabase(pool) {
-  dbPool = pool;
-}
-
 // Initialize consumer
 async function initConsumer() {
   try {
@@ -35,7 +29,7 @@ async function initConsumer() {
     // Subscribe to topics
     await consumer.subscribe({ 
       topics: [TOPICS.BOOKING_REQUESTS, TOPICS.BOOKING_UPDATES],
-      fromBeginning: false  // Only new messages
+      fromBeginning: false
     });
     console.log('✅ [CONSUMER] Subscribed to topics');
 
@@ -58,21 +52,14 @@ async function handleBookingRequest(message) {
     console.log(`   Property: ${data.property_id}`);
     console.log(`   Dates: ${data.start_date} to ${data.end_date}`);
 
-    // Update database - mark booking as received (FIXED: id instead of booking_id)
-    if (dbPool) {
-      await dbPool.query(
-        'UPDATE bookings SET status = ? WHERE id = ?',
-        ['pending', data.booking_id]
-      );
-      console.log(`   ✅ Updated booking status in database`);
-    }
+    // Update MongoDB - mark booking as pending
+    const db = getDB();
+    await db.collection('bookings').updateOne(
+      { _id: new ObjectId(data.booking_id) },
+      { $set: { status: 'PENDING' } }
+    );
+    console.log(`   ✅ Updated booking status in database`);
 
-    // Here you could:
-    // - Send notification to owner
-    // - Check availability
-    // - Process payment
-    // - Send email
-    
     console.log(`   ✅ Booking request processed successfully`);
     
   } catch (error) {
@@ -89,25 +76,21 @@ async function handleBookingUpdate(message) {
     console.log(`   Status: ${data.status}`);
     console.log(`   Notes: ${data.notes || 'N/A'}`);
 
-    // Update database with owner's decision (FIXED: id instead of booking_id)
-    if (dbPool) {
-      await dbPool.query(
-        'UPDATE bookings SET status = ? WHERE id = ?',
-        [data.status, data.booking_id]
-      );
-      console.log(`   ✅ Updated booking with owner's decision`);
+    // Update MongoDB with owner's decision
+    const db = getDB();
+    await db.collection('bookings').updateOne(
+      { _id: new ObjectId(data.booking_id) },
+      { $set: { status: data.status.toUpperCase() } }
+    );
+    console.log(`   ✅ Updated booking with owner's decision`);
 
-      // Get traveler info for notification (FIXED: id instead of booking_id)
-      const [booking] = await dbPool.query(
-        'SELECT traveler_id FROM bookings WHERE id = ?',
-        [data.booking_id]
-      );
+    // Get traveler info for notification
+    const booking = await db.collection('bookings').findOne({
+      _id: new ObjectId(data.booking_id)
+    });
 
-      if (booking.length > 0) {
-        // Send notification to traveler (via Kafka or email)
-        console.log(`   📧 Notifying traveler ${booking[0].traveler_id}`);
-        // You could publish to TRAVELER_NOTIFICATIONS topic here
-      }
+    if (booking) {
+      console.log(`   📧 Notifying traveler ${booking.traveler_id}`);
     }
 
     console.log(`   ✅ Booking update processed successfully`);
@@ -157,6 +140,5 @@ async function disconnectConsumer() {
 module.exports = {
   initConsumer,
   disconnectConsumer,
-  setDatabase,
   TOPICS,
 };
