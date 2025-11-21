@@ -7,7 +7,7 @@ function PropertyForm() {
   const nav = useNavigate();
   const { id } = useParams();
   const editing = !!id;
-
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "",
     type: "Entire Home",
@@ -146,8 +146,10 @@ function PropertyForm() {
       nav("/owner/dashboard");
     } catch (err) {
       console.error(err);
-      alert("Failed to save property. Please try again.");
-    }
+      alert(err?.message || "Failed to save property. Please try again.");
+    } finally {
+    setSaving(false);
+  }
   }
 
   return (

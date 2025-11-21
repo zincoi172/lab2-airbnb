@@ -8,6 +8,7 @@ function Ownerprofile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState(() => window.location.hash || "#about");
+  const [err, setErr] = useState("");
 
   // helper to compute active class
   const linkClass = (hash) =>
@@ -35,6 +36,7 @@ function Ownerprofile() {
         setUser((data && (data.profile ?? data)) || null);
       } catch (e) {
         console.error("Failed to load profile:", e);
+        setErr(e.response?.data?.error || e.message || "Failed to load");
       } finally {
         setLoading(false);
       }

@@ -15,7 +15,7 @@ import ProfileEditO from './owner/profileEdit';
 import reportWebVitals from './reportWebVitals';
 import ProtectedRoute from "./utils/ProtectedRoute";
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap/dist/js/bootstrap';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import {Provider} from 'react-redux'
 import {store, persistor} from './store'

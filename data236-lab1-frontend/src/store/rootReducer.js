@@ -6,7 +6,11 @@ import authReducer from '../features/authSlice'
 import bookingsReducer from '../features/bookingsSlice'
 import propertiesReducer from '../features/propertiesSlice'
 
-const bookingsPersistConfig = { key: 'bookings', storage, whitelist: ['favorites'] }
+const bookingsPersistConfig = {
+  key: 'bookings',
+  storage,
+  whitelist: ['favorites'],
+}
 const persistedBookings = persistReducer(bookingsPersistConfig, bookingsReducer)
 
 export default combineReducers({
