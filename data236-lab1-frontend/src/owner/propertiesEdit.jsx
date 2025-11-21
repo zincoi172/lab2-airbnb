@@ -124,9 +124,8 @@ function PropertyForm() {
         bathrooms: Number(form.bathrooms),
         description: form.description,
         amenities: form.amenities,
-        location: JSON.stringify(form.location), // backend stores string
-        photo_urls, // array of {url,key}
-        // guests not shown in form; backend has default 1
+        location: JSON.stringify(form.location), 
+        photo_urls, 
       };
 
       if (editing) {

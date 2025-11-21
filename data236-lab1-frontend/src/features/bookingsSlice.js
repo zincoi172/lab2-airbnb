@@ -1,4 +1,3 @@
-// src/features/bookingSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000/api'
@@ -27,11 +26,9 @@ export const fetchMyBookings = createAsyncThunk(
   }
 );
 
-// 建立訂單（建議帶完整 payload）
 export const createBooking = createAsyncThunk(
   'bookings/createBooking',
   async (payload, thunkAPI) => {
-    // payload: { propertyId, checkIn, checkOut, guests }
     try {
       const token = thunkAPI.getState().auth.token
       const res = await fetch(`${API_URL}/traveler/bookings`, {
