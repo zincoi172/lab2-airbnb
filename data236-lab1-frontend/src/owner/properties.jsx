@@ -1,6 +1,8 @@
-import Layout from "../main/layout";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
+
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4000/api";
 
 function prettyLocation(loc) {
   if (!loc) return "";
@@ -16,73 +18,76 @@ function prettyLocation(loc) {
   }
 }
 
+function toFirstImage(photo_urls) {
+  const arr = Array.isArray(photo_urls) ? photo_urls : [];
+  if (!arr.length) return "https://via.placeholder.com/192x192?text=No+photo";
+  const first = arr[0];
+  return typeof first === "string" ? first : first?.url || "https://via.placeholder.com/192x192?text=No+photo";
+}
+
 function OwnerProperties() {
-  const [list, setList] = useState([]);   
+  const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
-  useEffect(()=>{
-    (async ()=>{
-      try{
-        const { data } = await axios.get("http://localhost:4000/api/owner/dashboard", {
-          withCredentials: true
+  useEffect(() => {
+    const ac = new AbortController();
+    (async () => {
+      try {
+        const { data } = await axios.get(`${API_URL}/owner/dashboard`, {
+          withCredentials: true,
+          signal: ac.signal,
         });
-
-        console.log("Raw property data:", data.myProperties);
-
-        const normalized = (data.myProperties || []).map(p => {
-          const photos = Array.isArray(p.photo_urls) ? p.photo_urls : [];
-          const firstUrl = photos.length
-            ? (typeof photos[0] === "string" ? photos[0] : photos[0].url)
-            : "https://via.placeholder.com/192x192?text=No+photo";
-
-          const propertyId = p.id || p._id || p.property_id;
-          console.log("Property ID:", propertyId);
-
-          return {
-            id: propertyId,
-            name: p.title || "Untitled",
-            type: p.type,
-            price: p.price_per_night != null ? Number(p.price_per_night) : 0,
-            bedrooms: p.bedrooms ?? null,
-            bathrooms: p.bathrooms ?? null,
-            amenities: Array.isArray(p.amenities) ? p.amenities : [],
-            locationText: prettyLocation(p.location),
-            photo: firstUrl,
-          };
-        });
+        const normalized = (data?.myProperties || []).map((p) => ({
+          id: p.id,
+          name: p.title || "Untitled",
+          type: p.type,
+          price: p.price_per_night != null ? Number(p.price_per_night) : 0,
+          bedrooms: p.bedrooms ?? null,
+          bathrooms: p.bathrooms ?? null,
+          amenities: Array.isArray(p.amenities) ? p.amenities : [],
+          locationText: prettyLocation(p.location),
+          photo: toFirstImage(p.photo_urls),
+        }));
 
         setList(normalized);
-      } catch(err) {
-        console.error("Error loading properties:", err);
+      } catch (e) {
+        if (axios.isCancel?.(e) || e.code === 'ERR_CANCELED' || e.name === 'CanceledError') {
+          return;
+        }
+        setErr(e?.response?.data?.error || e.message || "Failed to load");
       } finally {
         setLoading(false);
       }
     })();
-  },[]);
+    return () => ac.abort();
+  }, []);
 
-  if (loading) return (
-    <div className="bg-white min-vh-100">
-      <main className="container py-4">
-        Loading…
-      </main>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="bg-white min-vh-100">
+        <main className="container py-4">Loading…</main>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="mb-0">My properties</h2>
-        <a href="/owner/properties/new" className="btn btn-outline-secondary rounded-pill px-4">
+        <Link to="/owner/properties/new" className="btn btn-outline-secondary rounded-pill px-4">
           + New property
-        </a>
+        </Link>
       </div>
 
-      {list.length === 0 && (
+      {err && <div className="alert alert-danger">{err}</div>}
+
+      {list.length === 0 && !err && (
         <div className="card p-4 d-flex align-items-center justify-content-center" style={{ borderRadius: 12 }}>
-          <p className="text-muted mb-2">You don't have any properties yet.</p>
-          <a href="/owner/properties/new" className="btn btn-dark rounded-pill px-4">
+          <p className="text-muted mb-2">You don’t have any properties yet.</p>
+          <Link to="/owner/properties/new" className="btn btn-dark rounded-pill px-4">
             Create your first listing
-          </a>
+          </Link>
         </div>
       )}
 
@@ -91,13 +96,7 @@ function OwnerProperties() {
           <div key={p.id} className="card p-4" style={{ borderRadius: 12 }}>
             <div className="d-flex align-items-center gap-3 flex-wrap">
               <div className="position-relative" style={{ width: 96, height: 96, borderRadius: 12, overflow: "hidden" }}>
-                <img
-                  src={p.photo}
-                  alt={p.name}
-                  width="96"
-                  height="96"
-                  style={{ objectFit: "cover" }}
-                />
+                <img src={p.photo} alt={p.name} width="96" height="96" style={{ objectFit: "cover" }} />
               </div>
 
               <div className="flex-grow-1">
@@ -108,7 +107,7 @@ function OwnerProperties() {
                   {p.bathrooms != null && ` · ${p.bathrooms} ba`}
                   {p.locationText && ` · ${p.locationText}`}
                 </div>
-                {!!(p.amenities?.length) && (
+                {!!p.amenities?.length && (
                   <div className="text-muted small mt-1">
                     Amenities: {p.amenities.slice(0, 3).join(", ")}
                     {p.amenities.length > 3 && " …"}
@@ -117,15 +116,9 @@ function OwnerProperties() {
               </div>
 
               <div className="d-flex gap-2">
-                <a
-                  href={`/owner/properties/${p.id}/edit`}
-                  className="btn btn-outline-secondary rounded-pill px-4"
-                  onClick={(e) => {
-                    console.log("Navigating to edit with ID:", p.id);
-                  }}
-                >
+                <Link to={`/owner/properties/${p.id}/edit`} className="btn btn-outline-secondary rounded-pill px-4">
                   Edit
-                </a>
+                </Link>
               </div>
             </div>
           </div>

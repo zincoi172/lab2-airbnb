@@ -1,154 +1,144 @@
 const { Router } = require("express");
-const { getDB } = require("../db/mongodb.cjs");
-const { ObjectId } = require("mongodb");
+const { pool } = require("../db/pool.cjs");
 const { requireAuth, requireRole } = require("../middleware/requireAuth.cjs");
 
 const router = Router();
 
-// Helper to safely convert to ObjectId
-function toObjectId(id) {
-  if (!id) return null;
-  if (id instanceof ObjectId) return id;
-  if (typeof id === 'string' && ObjectId.isValid(id)) {
-    return new ObjectId(id);
-  }
-  return id;
-}
-
-// Helper to serialize property
-function serializeProperty(property) {
-  return {
-    ...property,
-    _id: property._id.toString(),
-    owner_id: property.owner_id.toString()
-  };
-}
-
-// Property Posting - Post property for rent
+// Property Posting - Post property for rent with details:
+// Location, description, photos
+// Pricing, amenities, availability
+// And some more details as needed
 router.post("/", requireAuth, requireRole("owner"), async (req, res) => {
-  try {
-    const {
-      type,
-      title,
-      location,
-      description = null,
-      price_per_night,
-      bedrooms = 1,
-      bathrooms = 1,
-      guests = 1,
-      amenities = [],
-      photo_urls = [],
-    } = req.body || {};
+  const {
+    type,
+    title,
+    location,
+    description = null,
+    price_per_night,
+    bedrooms = 1,
+    bathrooms = 1,
+    guests = 1,
+    amenities = [],
+    photo_urls = [],
+  } = req.body || {};
 
-    if (!type || !title || !location || price_per_night == null) {
-      return res.status(400).json({ error: "type, title, location, price_per_night required" });
-    }
+  if (!type || !title || !location || price_per_night == null) {
+    return res.status(400).json({ error: "type, title, location, price_per_night required" });
+  }
 
-    const db = getDB();
-    
-    const result = await db.collection('properties').insertOne({
-      owner_id: toObjectId(req.session.user.id),
-      type: String(type),
-      title: String(title),
-      location: String(location),
+  const [r] = await pool.query(
+    `INSERT INTO properties
+      (owner_id, type, title, location, description, price_per_night, bedrooms, bathrooms, guests, amenities, photo_urls)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      req.session.user.id,
+      String(type),
+      String(title),
+      String(location),
       description,
       price_per_night,
       bedrooms,
       bathrooms,
       guests,
-      amenities: amenities || [],
-      photo_urls: photo_urls || [],
-      created_at: new Date()
-    });
-    
-    res.status(201).json({ id: result.insertedId.toString() });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message });
-  }
+      JSON.stringify(amenities ?? []),
+      JSON.stringify(photo_urls ?? []),
+    ]
+  );
+  res.status(201).json({ id: r.insertId });
 });
 
-// Update property details
+// Profile Management - Add/edit with details
+// (property name, type, amentities, pricing, bedrooms, bathrooms, avalability and more)
 router.put("/:id", requireAuth, requireRole("owner"), async (req, res) => {
-  try {
-    const id = req.params.id;
-    const db = getDB();
-    
-    // Ensure ownership
-    const owned = await db.collection('properties').findOne({
-      _id: toObjectId(id),
-      owner_id: toObjectId(req.session.user.id)
-    });
-    
-    if (!owned) {
-      return res.status(403).json({ error: "Not your property" });
-    }
+  const id = req.params.id;
+  // Ensure ownership
+  const [owned] = await pool.query("SELECT id FROM properties WHERE id = ? AND owner_id = ?", [id, req.session.user.id]);
+  if (!owned.length) return res.status(403).json({ error: "Not your property" });
 
-    const fields = [
-      "type", "title", "location", "description", "price_per_night",
-      "bedrooms", "bathrooms", "guests", "amenities", "photo_urls", "rating"
-    ];
-    
-    const updates = {};
-    for (const f of fields) {
-      if (req.body?.[f] !== undefined) {
-        updates[f] = req.body[f];
+  const fields = [
+    "type",
+    "title",
+    "location",
+    "description",
+    "price_per_night",
+    "bedrooms",
+    "bathrooms",
+    "guests",
+    "amenities",
+    "photo_urls",
+    "rating",
+  ];
+  const updates = [];
+  const params = [];
+  for (const f of fields) {
+    if (req.body?.[f] !== undefined) {
+      if (f === "amenities" || f === "photo_urls") {
+        updates.push(`${f} = ?`);
+        params.push(JSON.stringify(req.body[f] ?? []));
+      } else {
+        updates.push(`${f} = ?`);
+        params.push(req.body[f]);
       }
     }
-    
-    if (Object.keys(updates).length === 0) {
-      return res.json({ ok: true });
-    }
-    
-    await db.collection('properties').updateOne(
-      { _id: toObjectId(id) },
-      { $set: updates }
-    );
-    
-    res.json({ ok: true });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message });
   }
+  if (!updates.length) return res.json({ ok: true });
+  params.push(id);
+  await pool.query(`UPDATE properties SET ${updates.join(", ")} WHERE id = ?`, params);
+  res.json({ ok: true });
 });
 
-// Delete property
+// Owner deletes property
 router.delete("/:id", requireAuth, requireRole("owner"), async (req, res) => {
-  try {
-    const db = getDB();
-    
-    await db.collection('properties').deleteOne({
-      _id: toObjectId(req.params.id),
-      owner_id: toObjectId(req.session.user.id)
-    });
-    
-    res.json({ ok: true });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message });
-  }
+  await pool.query("DELETE FROM properties WHERE id = ? AND owner_id = ?", [req.params.id, req.session.user.id]);
+  res.json({ ok: true });
 });
 
-// Get single property (owner's own)
-router.get("/:id", requireAuth, requireRole("owner"), async (req, res) => {
+function parseJsonSafe(v, fallback) {
+  if (v == null) return fallback;
+  if (typeof v === "object") return v; 
   try {
-    const id = req.params.id;
-    const db = getDB();
-    
-    const property = await db.collection('properties').findOne({
-      _id: toObjectId(id),
-      owner_id: toObjectId(req.session.user.id)
+    return JSON.parse(v);
+  } catch {
+    return fallback;
+  }
+}
+
+router.get("/:id", requireAuth, requireRole("owner"), async (req, res) => {
+  const id = req.params.id;
+  try {
+    const [rows] = await pool.query(
+      "SELECT * FROM properties WHERE id = ? AND owner_id = ?",
+      [id, req.session.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Property not found" });
+
+    const p = rows[0];
+
+    const amenities  = parseJsonSafe(p.amenities,  []);
+    const photo_urls = parseJsonSafe(p.photo_urls, []);
+    const location   = parseJsonSafe(p.location,   null);
+
+    res.json({
+      id: p.id,
+      owner_id: p.owner_id,
+      type: p.type,
+      title: p.title,
+      location,
+      description: p.description,
+      price_per_night: p.price_per_night,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      guests: p.guests,
+      amenities,
+      photo_urls,
+      rating: p.rating,
+      created_at: p.created_at,
     });
-    
-    if (!property) {
-      return res.status(404).json({ error: "Property not found" });
-    }
-    
-    res.json(serializeProperty(property));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Failed to fetch property" });
   }
 });
+
 
 module.exports = router;

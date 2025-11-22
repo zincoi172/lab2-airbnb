@@ -1,15 +1,17 @@
 import './layout.css';
-import Login from '../main/login';
-import Signup from '../main/signup';
-import { useLocation, Link, useNavigate } from "react-router-dom";
+import { useLocation, Link, useNavigate, replace } from "react-router-dom";
 import { useEffect, useState, useMemo } from "react";
 import { formatToday } from '../utils/date';
+import { useDispatch } from 'react-redux';
+import { logout as logoutAction } from '../features/authSlice';
+import { persistor } from '../store';
 
 function Layout() {
   const location = useLocation();
   const nav = useNavigate();                 
   const todayStr = formatToday();
-
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [me, setMe] = useState(null);
   const [where, setWhere] = useState("");
   const [checkin, setCheckin] = useState("");
@@ -53,10 +55,12 @@ function Layout() {
         method: "POST",
         credentials: "include",
       });
-      setMe(null);
-      window.location.replace("/");
     } catch (e) {
       console.error(e);
+    } finally {
+      dispatch(logoutAction());
+      await persistor.purge();
+      navigate("/", {replace: true})
     }
   }
   function onSearch(e) {
@@ -201,15 +205,13 @@ function Layout() {
                         </>
                       )
                     )}
+                    
                   </div>
                 </li>
               </ul>
             </div>
           </div>
         </div>
-
-        <Login onLoggedIn={(user) => setMe(user)} />
-        <Signup onSignedUp={(user) => setMe(user)} />
       </div>
     </nav>
   );

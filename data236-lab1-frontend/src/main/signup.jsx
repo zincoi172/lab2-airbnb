@@ -1,80 +1,104 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { signup, clearAuthError } from "../features/authSlice";
+import { useNavigate } from "react-router-dom";
 
 function Signup({ onSignedUp }) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { loading, error } = useSelector((s) => s.auth);
+
   const [role, setRole] = useState("Traveler"); // Traveler / Owner
   const [form, setForm] = useState({
     first_name: "",
-    last_name:"",
+    last_name: "",
     email: "",
     password: "",
     location: "",
   });
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  function onChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  }
+  const signupPromiseRef = useRef(null);
+
+  useEffect(() => {
+    const el = document.getElementById("signupModal");
+    if (!el) return;
+
+    const handleShown = () => {
+      dispatch(clearAuthError());
+    };
+    const handleHidden = () => {
+      dispatch(clearAuthError());
+      signupPromiseRef.current?.abort?.();
+      signupPromiseRef.current = null;
+      setForm({
+        first_name: "",
+        last_name: "",
+        email: "",
+        password: "",
+        location: "",
+      });
+      setRole("Traveler");
+    };
+
+    el.addEventListener("shown.bs.modal", handleShown);
+    el.addEventListener("hidden.bs.modal", handleHidden);
+    return () => {
+      el.removeEventListener("shown.bs.modal", handleShown);
+      el.removeEventListener("hidden.bs.modal", handleHidden);
+    };
+  }, [dispatch]);
+
+  const onChange = (e) => {
+    if (error) dispatch(clearAuthError());
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const onRoleChange = (nextRole) => {
+    if (error) dispatch(clearAuthError());
+    setRole(nextRole);
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setErr("");
-    setLoading(true);
 
-    try {
-      const endpoint = "http://localhost:4000/api/auth/signup";
+    signupPromiseRef.current?.abort?.();
 
-      const payload = {
-        first_name: form.first_name,
-        last_name: form.last_name,
-        email: form.email,
-        password: form.password,
-        role: role.toLowerCase(),
-        ...(role === "Owner" ? { location: form.location } : {}),
-      };
+    const payload = {
+      first_name: form.first_name,
+      last_name: form.last_name,
+      email: form.email,
+      password: form.password,
+      role: role.toLowerCase(),
+      ...(role === "Owner" ? { location: form.location } : {}),
+    };
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
+    const promise = dispatch(signup(payload));
+    signupPromiseRef.current = promise;
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Signup failed");
+    const res = await promise;
+    signupPromiseRef.current = null;
+
+    if (res.meta.requestStatus === "fulfilled") {
+      const user = res.payload?.user;
+      const effectiveRole = user?.role ?? res.payload?.role ?? role.toLowerCase();
 
       document.querySelector("#signupModal .btn-close")?.click();
-      onSignedUp?.(data.user);
+      onSignedUp?.(user ?? { role: effectiveRole });
 
-      if (data.user?.role === "owner") {
-        window.location.replace("/owner/dashboard");
-      } else {
-        window.location.replace("/traveler/profile");
-      }
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setLoading(false);
+      if (effectiveRole === "owner") navigate("/owner/dashboard", { replace: true });
+      else navigate("/traveler/profile", { replace: true });
     }
   }
 
+  const isOwner = role === "Owner";
+
   return (
-    <div
-      className="modal fade"
-      id="signupModal"
-      tabIndex="-1"
-      aria-labelledby="signupModalLabel"
-      aria-hidden="true"
-    >
+    <div className="modal fade" id="signupModal" tabIndex="-1" aria-hidden="true">
       <div className="modal-dialog modal-dialog-centered">
         <div className="modal-content p-3 rounded-3">
           <div className="modal-header border-0">
-            <button
-              type="button"
-              className="btn-close"
-              data-bs-dismiss="modal"
-              aria-label="Close"
-            ></button>
+            <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
 
           <form className="modal-body" onSubmit={handleSubmit}>
@@ -83,28 +107,23 @@ function Signup({ onSignedUp }) {
             <div className="d-flex justify-content-center gap-3 mb-3">
               <button
                 type="button"
-                className={`btn rounded-pill px-4 ${
-                  role === "Traveler" ? "btn-danger" : "btn-outline-danger"
-                }`}
-                onClick={() => setRole("Traveler")}
+                className={`btn rounded-pill px-4 ${role === "Traveler" ? "btn-danger" : "btn-outline-danger"}`}
+                onClick={() => onRoleChange("Traveler")}
               >
                 Traveler
               </button>
               <button
                 type="button"
-                className={`btn rounded-pill px-4 ${
-                  role === "Owner" ? "btn-danger" : "btn-outline-danger"
-                }`}
-                onClick={() => setRole("Owner")}
+                className={`btn rounded-pill px-4 ${isOwner ? "btn-danger" : "btn-outline-danger"}`}
+                onClick={() => onRoleChange("Owner")}
               >
                 Owner
               </button>
             </div>
 
-            {err && <div className="alert alert-danger">{err}</div>}
+            {error && <div className="alert alert-danger">{error}</div>}
 
             <input
-              type="text"
               name="first_name"
               className="form-control mb-3"
               placeholder="First Name"
@@ -113,7 +132,6 @@ function Signup({ onSignedUp }) {
               required
             />
             <input
-              type="text"
               name="last_name"
               className="form-control mb-3"
               placeholder="Last Name"
@@ -129,6 +147,7 @@ function Signup({ onSignedUp }) {
               value={form.email}
               onChange={onChange}
               required
+              autoComplete="email"
             />
             <input
               type="password"
@@ -138,11 +157,11 @@ function Signup({ onSignedUp }) {
               value={form.password}
               onChange={onChange}
               required
+              autoComplete="new-password"
             />
 
-            {role === "Owner" && (
+            {isOwner && (
               <input
-                type="text"
                 name="location"
                 className="form-control mb-3"
                 placeholder="Location (e.g. Los Angeles, CA)"
@@ -152,11 +171,7 @@ function Signup({ onSignedUp }) {
               />
             )}
 
-            <button
-              className="btn btn-danger w-100 mb-3"
-              type="submit"
-              disabled={loading}
-            >
+            <button className="btn btn-danger w-100 mb-3" type="submit" disabled={loading}>
               {loading ? "Signing up..." : `Sign up as ${role}`}
             </button>
           </form>

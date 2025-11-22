@@ -1,9 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../main/layout";
 import { formatToday } from "../utils/date";
 import AgentFab from "../agent/Agent";
 
+import { useDispatch, useSelector } from "react-redux";
+import {
+  fetchPropertyById,
+  selectPropertyDetail,
+  selectPropertyLoading,
+  selectPropertyError,
+  clearPropertyError,
+} from "../features/propertiesSlice";
+import { toggleFavorite, selectFavorites } from "../features/bookingsSlice";
+
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4000/api";
+
+// ---------- utils ----------
 function prettyLocation(loc) {
   if (!loc) return "";
   if (typeof loc === "object") {
@@ -19,27 +32,24 @@ function prettyLocation(loc) {
 }
 
 function normalizeProperty(p) {
-  const photos =
-    Array.isArray(p.photo_urls)
-      ? p.photo_urls
-          .map((ph) => (typeof ph === "string" ? ph : ph?.url))
-          .filter(Boolean)
-      : [];
+  const photos = Array.isArray(p?.photo_urls)
+    ? p.photo_urls.map((ph) => (typeof ph === "string" ? ph : ph?.url)).filter(Boolean)
+    : [];
 
   return {
-    id: p._id || p.id,
-    name: p.title || "Untitled",
-    type: p.type,
-    price: p.price_per_night != null ? Number(p.price_per_night) : 0,
-    bedrooms: p.bedrooms ?? 0,
-    bathrooms: p.bathrooms ?? 0,
-    guests: p.guests ?? 1,
-    amenities: Array.isArray(p.amenities) ? p.amenities : [],
-    rating: p.rating ?? 4.9,
-    locationText: prettyLocation(p.location),
-    images: photos.length > 0 ? photos : ["https://via.placeholder.com/1280x800?text=No+photo"],
-    owner_name: p.owner_name || null,
-    description: p.description || "",
+    id: p?.id,
+    name: p?.title || "Untitled",
+    type: p?.type,
+    price: p?.price_per_night != null ? Number(p.price_per_night) : 0,
+    bedrooms: p?.bedrooms ?? 0,
+    bathrooms: p?.bathrooms ?? 0,
+    guests: p?.guests ?? 1,
+    amenities: Array.isArray(p?.amenities) ? p.amenities : [],
+    rating: p?.rating ?? 4.9,
+    locationText: prettyLocation(p?.location),
+    images: photos.length ? photos : ["https://via.placeholder.com/1280x800?text=No+photo"],
+    owner_name: p?.owner_name || null,
+    description: p?.description || "",
   };
 }
 
@@ -49,37 +59,94 @@ function imgSrc(url) {
     : `http://localhost:4000${url?.startsWith("/") ? url : `/${url}`}`;
 }
 
-function PropertyDetails() {
+// ---------- component ----------
+export default function PropertyDetails() {
   const { id } = useParams();
-  const [property, setProperty] = useState(null);
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const detail = useSelector(selectPropertyDetail);
+  const loading = useSelector(selectPropertyLoading);
+  const error = useSelector(selectPropertyError);
+
+  const favs = useSelector(selectFavorites);
+
   const [checkin, setCheckin] = useState("");
   const [checkout, setCheckout] = useState("");
   const [guests, setGuests] = useState(1);
-  const navigate = useNavigate();
   const todayStr = formatToday();
 
   useEffect(() => {
-    fetch(`http://localhost:4000/api/properties/${id}`)
-      .then((res) => res.json())
-      .then((data) => setProperty(normalizeProperty(data)))
-      .catch(console.error);
-  }, [id]);
+    dispatch(fetchPropertyById(id));
+    return () => {
+      dispatch(clearPropertyError());
+    };
+  }, [dispatch, id]);
 
-  const bookingContext = property ? {
-   location: property.locationText || "",
-   start_date: checkin || "",          
-   end_date: checkout || "",
-   party_type: "family",
-   guests: Number(guests || 1),
- } : null;
+  const property = useMemo(() => (detail ? normalizeProperty(detail) : null), [detail]);
 
-  if (!property) return <div className="container py-5">Loading...</div>;
+  async function handleToggleFav(propertyId) {
+    const me = await fetch(`${API_URL}/auth/me`, { credentials: "include" })
+      .then((r) => r.json())
+      .catch(() => ({}));
+    if (!me?.user) {
+      alert("Please log in or sign up to add favorites.");
+      try {
+        localStorage.setItem("showLogin", "1");
+      } catch {}
+      return;
+    }
+
+    dispatch(toggleFavorite(propertyId));
+
+    try {
+      const res = await fetch(`${API_URL}/traveler/favorites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ property_id: propertyId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to update favorite");
+      }
+    } catch (e) {
+      dispatch(toggleFavorite(propertyId));
+      console.error("Favorite toggle failed:", e);
+      alert("Failed to update favorite. Please try again.");
+    }
+  }
+
+  if (loading || !property) return <div className="container py-5">Loading...</div>;
+  if (error) return <div className="container py-5 alert alert-danger">{error}</div>;
+
+  const bookingContext = {
+    location: property.locationText || "",
+    start_date: checkin || "",
+    end_date: checkout || "",
+    party_type: "family",
+    guests: Number(guests || 1),
+  };
+
+  const isFav = favs.includes(property.id);
 
   return (
     <>
       <Layout />
       <div className="container py-4">
-        <h2 className="fw-bold mb-2">{property.name}</h2>
+        <div className="d-flex align-items-center justify-content-between mb-2">
+          <h2 className="fw-bold mb-0">{property.name}</h2>
+          <button
+            type="button"
+            className={`btn btn-sm ${isFav ? "btn-danger" : "btn-outline-danger"}`}
+            onClick={() => handleToggleFav(property.id)}
+            aria-label={isFav ? "Remove favorite" : "Add favorite"}
+            title={isFav ? "Remove favorite" : "Add favorite"}
+          >
+            {isFav ? "♥ Saved" : "♡ Save"}
+          </button>
+        </div>
+
         <p className="text-muted mb-4">
           {property.locationText} · {property.bedrooms} bedrooms · {property.bathrooms} baths
         </p>
@@ -211,5 +278,3 @@ function PropertyDetails() {
     </>
   );
 }
-
-export default PropertyDetails;

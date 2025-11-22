@@ -7,9 +7,7 @@ function PropertyForm() {
   const nav = useNavigate();
   const { id } = useParams();
   const editing = !!id;
-
-  console.log("PropertyForm - ID from params:", id); // DEBUG
-
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "",
     type: "Entire Home",
@@ -170,8 +168,8 @@ function PropertyForm() {
         bathrooms: Number(form.bathrooms),
         description: form.description,
         amenities: form.amenities,
-        location: JSON.stringify(form.location),
-        photo_urls,
+        location: JSON.stringify(form.location), 
+        photo_urls, 
       };
 
       console.log("Submitting payload:", payload);
@@ -201,17 +199,11 @@ function PropertyForm() {
       alert("Property saved successfully!");
       nav("/owner/dashboard");
     } catch (err) {
-      console.error("Save error:", err);
-      console.error("Error response:", err.response?.data);
-      
-      if (err.response?.status === 403) {
-        alert("You don't have permission to edit this property. Please log in again.");
-      } else {
-        alert("Failed to save property: " + (err.response?.data?.message || err.message));
-      }
+      console.error(err);
+      alert(err?.message || "Failed to save property. Please try again.");
     } finally {
-      setLoading(false);
-    }
+    setSaving(false);
+  }
   }
 
   if (loading && editing) {

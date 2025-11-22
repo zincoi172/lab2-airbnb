@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import Layout from "../main/layout";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  createBooking,
+  resetCurrentBooking,
+  clearBookingError,
+  selectBookingLoading,
+  selectBookingError,
+} from "../features/bookingsSlice";
 
 function diffNights(checkin, checkout) {
   if (!checkin || !checkout) return 0;
@@ -24,11 +32,11 @@ export default function BookingRequest() {
   const { id } = useParams();
   const [sp] = useSearchParams();
   const navigate = useNavigate();
-
+  const dispatch = useDispatch(); 
   const [property, setProperty] = useState(null);
   const [payOption, setPayOption] = useState("pay_now");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const loading = useSelector(selectBookingLoading);
+  const err = useSelector(selectBookingError);
 
   const checkin = sp.get("checkin") || "";
   const checkout = sp.get("checkout") || "";
@@ -39,6 +47,13 @@ export default function BookingRequest() {
   const subtotal = nights * pricePerNight;
   const taxes = Math.round(subtotal * 0.0975 * 100) / 100;
   const total = Math.round((subtotal + taxes) * 100) / 100;
+
+  useEffect(() => {
+    return () => {
+      dispatch(resetCurrentBooking());
+      dispatch(clearBookingError());
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     (async () => {
@@ -59,53 +74,35 @@ export default function BookingRequest() {
         setProperty(normalized);
       } catch (e) {
         console.error(e);
-        setErr("Failed to load property information.");
       }
     })();
   }, [id]);
 
   async function submitBooking() {
-    setErr("");
     if (!checkin || !checkout) {
-      setErr("Please select check-in and check-out dates.");
+      dispatch(clearBookingError());
+      alert("Please select check-in and check-out dates.");
       return;
     }
     if (diffNights(checkin, checkout) <= 0) {
-      setErr("Check-out must be after check-in.");
+      dispatch(clearBookingError());
+      alert("Check-out must be after check-in.");
       return;
     }
-
-    setLoading(true);
-    try {
-      const res = await fetch("http://localhost:4000/api/traveler/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          property_id: id,  // ← Use id directly (it's already a string from URL params)
-          start_date: checkin,
-          end_date: checkout,
-          guests,
-          pay_option: payOption,
-        }),
-      });
-
-      if (res.status === 401 || res.status === 403) {
-        localStorage.setItem("showLogin", "1");
-        navigate("/");
-        return;
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Booking failed");
-      }
-
+    const res = await dispatch(
+      createBooking({
+        property_id: Number(id),
+        start_date: checkin,
+        end_date: checkout,
+        guests,
+        pay_option: payOption,
+      })
+    );
+    if (res.meta.requestStatus === "fulfilled") {
       navigate(`/traveler/profile#past-trips`);
-    } catch (e) {
-      console.error(e);
-      setErr(e.message);
-    } finally {
-      setLoading(false);
+    } else if ((res.payload || "").toString().includes("401")) {
+      localStorage.setItem("showLogin", "1");
+      navigate("/");
     }
   }
 

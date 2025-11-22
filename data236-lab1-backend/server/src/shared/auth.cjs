@@ -1,11 +1,15 @@
-// Authentication routes using MongoDB
+// This code defines authentication routes for an Express.js server, 
+// Include handling user signup, login, logout, get current user info.
+// We have it in routes/auth.cjs because both owner and traveler use it.
+
 const { Router } = require("express");
 const bcrypt = require("bcrypt");
-const { getDB } = require("../db/mongodb.cjs");
+const { pool } = require("../db/pool.cjs");
 
 const router = Router();
 
-// Signup
+// Signup – Owner signs up with name, email ID, password, and location:
+// POST /api/auth/signup:
 router.post("/signup", async (req, res) => {
   try {
     let { first_name, last_name, name, email, password, role, location } = req.body || {};
@@ -25,45 +29,28 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ error: "location required for owner signup" });
     }
     if (role === "traveler") {
-      location = null;
+      location = null; // ignore location for traveler
     }
 
     email = String(email).trim().toLowerCase();
 
-    const db = getDB();
-    
-    // Check if email exists
-    const existingUser = await db.collection('users').findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ error: "Email already registered" });
-    }
+    const [exists] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
+    if (exists.length) return res.status(409).json({ error: "Email already registered" });
 
-    // Hash password
-    const password_hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(password, 10);
+    const [r] = await pool.query(
+      "INSERT INTO users (first_name, last_name, email, password_hash, role) VALUES (?,?,?,?,?)",
+      [first_name, last_name, email, hash, role]
+    );
 
-    // Insert user
-    const userResult = await db.collection('users').insertOne({
-      first_name,
-      last_name,
-      email,
-      password_hash,
-      role,
-      created_at: new Date()
-    });
-
-    const userId = userResult.insertedId;
-
-    // Insert user profile
-    await db.collection('user_profiles').insertOne({
-      user_id: userId,
-      first_name,
-      last_name,
-      email,
-      city: location
-    });
+    // Add location to user_profiles (city column)
+    await pool.query(
+      "INSERT INTO user_profiles (user_id, first_name, last_name, email, city) VALUES (?,?,?,?,?)",
+      [r.insertId, first_name, last_name, email, location]
+    );
 
     const user = {
-      id: userId,
+      id: r.insertId,
       first_name,
       last_name,
       name: `${first_name} ${last_name}`.trim(),
@@ -71,7 +58,6 @@ router.post("/signup", async (req, res) => {
       role,
       location,
     };
-    
     req.session.user = user;
     res.status(201).json({ user });
   } catch (e) {
@@ -80,44 +66,36 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// Login
+// Login/Logout – Implement session-based authentication:
+// POST /api/auth/login:
 router.post("/login", async (req, res) => {
   let { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: "Missing email/password" });
 
   try {
     email = String(email).trim().toLowerCase();
-    
-    const db = getDB();
-    const u = await db.collection('users').findOne({ email });
-    
-    if (!u) return res.status(401).json({ error: "Invalid credentials" });
+    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+    if (!rows.length) return res.status(401).json({ error: "Invalid credentials" });
 
+    const u = rows[0];
     const ok = await bcrypt.compare(password, u.password_hash);
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
     const user = {
-      id: u._id,
+      id: u.id,
       first_name: u.first_name,
       last_name: u.last_name,
       name: `${u.first_name} ${u.last_name}`.trim(),
       email: u.email,
       role: u.role,
     };
-    
     req.session.regenerate((err) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Login failed" });
-      }
+      if (err) return next(err);
 
       req.session.user = user;
 
       req.session.save((err) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: "Login failed" });
-        }
+        if (err) return next(err);
         return res.json({ user: req.session.user });
       });
     });
@@ -127,7 +105,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Logout
+// POST /api/auth/logout:
 router.post("/logout", (req, res) => {
   req.session.destroy(() => {
     res.clearCookie("connect.sid");
@@ -135,7 +113,9 @@ router.post("/logout", (req, res) => {
   });
 });
 
-// Get current user
+
+
+// GET /api/auth/me either travels or owner who is logged in
 router.get("/me", (req, res) => {
   res.json({ user: req.session.user || null });
 });

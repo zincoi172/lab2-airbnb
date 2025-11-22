@@ -1,108 +1,54 @@
-// Owner dashboard - MongoDB version
+// Owner dashboard
+
 const { Router } = require("express");
-const { getDB } = require("../db/mongodb.cjs");
-const { ObjectId } = require("mongodb");
+const { pool } = require("../db/pool.cjs");
 const { requireAuth, requireRole } = require("../middleware/requireAuth.cjs");
 
 const router = Router();
 
-// Helper to safely convert to ObjectId
-function toObjectId(id) {
-  if (!id) return null;
-  if (id instanceof ObjectId) return id;
-  if (typeof id === 'string' && ObjectId.isValid(id)) {
-    return new ObjectId(id);
-  }
-  return id;
-}
-
-// Helper to serialize properties and bookings
-function serializeProperty(property) {
-  return {
-    ...property,
-    _id: property._id.toString(),
-    owner_id: property.owner_id.toString()
-  };
-}
-
-function serializeBooking(booking) {
-  return {
-    ...booking,
-    _id: booking._id ? booking._id.toString() : undefined,
-    property_id: booking.property_id ? booking.property_id.toString() : undefined,
-    traveler_id: booking.traveler_id ? booking.traveler_id.toString() : undefined
-  };
-}
-
 // Owner dashboard
 router.get("/", requireAuth, requireRole("owner"), async (req, res) => {
-  try {
-    const u = req.session.user;
-    const db = getDB();
-    const userId = toObjectId(u.id);
+  const u = req.session.user;
+  // Shows quick stats for owner's properties and bookings
+  // Such as number of properties, pending bookings, accepted bookings, cancelled bookings
+  const [[counts]] = await pool.query(
+    `SELECT
+        (SELECT COUNT(*) FROM properties WHERE owner_id = ?) AS properties,
+        (SELECT COUNT(*) FROM bookings b
+           JOIN properties p ON p.id=b.property_id
+           WHERE p.owner_id = ? AND b.status='PENDING')  AS pending,
+        (SELECT COUNT(*) FROM bookings b
+           JOIN properties p ON p.id=b.property_id
+           WHERE p.owner_id = ? AND b.status='ACCEPTED') AS accepted,
+        (SELECT COUNT(*) FROM bookings b
+           JOIN properties p ON p.id=b.property_id
+           WHERE p.owner_id = ? AND b.status='CANCELLED') AS cancelled`,
+    [u.id, u.id, u.id, u.id]
+  );
 
-    // Get owner's properties
-    const myProperties = await db.collection('properties')
-      .find({ owner_id: userId })
-      .sort({ created_at: -1 })
-      .limit(20)
-      .toArray();
-    
-    const propertyIds = myProperties.map(p => p._id);
+  const [myProperties] = await pool.query(
+    `SELECT * FROM properties WHERE owner_id = ? ORDER BY created_at DESC LIMIT 20`,
+    [u.id]
+  );
+// Shows previous bookings and recent requests for owner's properties
+  const [recentBookings] = await pool.query(
+    `SELECT b.*, p.title, p.location,
+            CONCAT(uu.first_name, ' ', uu.last_name) AS traveler_name,
+            uu.email AS traveler_email
+     FROM bookings b
+     JOIN properties p ON p.id = b.property_id
+     JOIN users uu ON uu.id = b.traveler_id
+     WHERE p.owner_id = ?
+     ORDER BY b.created_at DESC LIMIT 10`,
+    [u.id]
+  );
 
-    // Get counts
-    const propertiesCount = myProperties.length;
-    const pendingCount = await db.collection('bookings').countDocuments({ 
-      property_id: { $in: propertyIds }, 
-      status: 'PENDING' 
-    });
-    const acceptedCount = await db.collection('bookings').countDocuments({ 
-      property_id: { $in: propertyIds }, 
-      status: 'ACCEPTED' 
-    });
-    const cancelledCount = await db.collection('bookings').countDocuments({ 
-      property_id: { $in: propertyIds }, 
-      status: 'CANCELLED' 
-    });
-
-    // Get recent bookings with details
-    const bookingsList = await db.collection('bookings')
-      .find({ property_id: { $in: propertyIds } })
-      .sort({ created_at: -1 })
-      .limit(10)
-      .toArray();
-    
-    // Enrich bookings with property and traveler details
-    const recentBookings = await Promise.all(bookingsList.map(async (booking) => {
-      const property = await db.collection('properties').findOne({ _id: booking.property_id });
-      const traveler = await db.collection('users').findOne({ _id: booking.traveler_id });
-      
-      return serializeBooking({
-        ...booking,
-        title: property?.title,
-        location: property?.location,
-        traveler_name: traveler ? `${traveler.first_name} ${traveler.last_name}` : 'Unknown',
-        traveler_email: traveler?.email
-      });
-    }));
-
-    res.json({
-      user: u,
-      counts: { 
-        properties: propertiesCount, 
-        bookings: { 
-          PENDING: pendingCount, 
-          ACCEPTED: acceptedCount, 
-          CANCELLED: cancelledCount 
-        } 
-      },
-      myProperties: myProperties.map(serializeProperty),
-      recentBookings,
-    });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message });
-  }
+  res.json({
+    user: u,
+    counts: { properties: counts.properties, bookings: { PENDING: counts.pending, ACCEPTED: counts.accepted, CANCELLED: counts.cancelled } },
+    myProperties,
+    recentBookings,
+  });
 });
 
 module.exports = router;
