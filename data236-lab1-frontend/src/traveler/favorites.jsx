@@ -41,7 +41,7 @@ function Favorites() {
 
         const data = await res.json();
         const normalized = (Array.isArray(data) ? data : []).map((p) => ({
-          id: p.id,
+          id: p._id || p.id,
           name: p.title || "Untitled",
           type: p.type,
           price: p.price_per_night != null ? Number(p.price_per_night) : 0,

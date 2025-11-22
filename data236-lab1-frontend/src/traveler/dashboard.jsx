@@ -61,9 +61,7 @@ export default function TravelerDashboard() {
       try { localStorage.setItem("showLogin", "1"); } catch {}
       return;
     }
-
     dispatch(toggleFavorite(propertyId));
-
     try {
       const res = await fetch(`${API_URL}/traveler/favorites`, {
         method: "POST",

@@ -38,7 +38,6 @@ function OwnerProperties() {
           withCredentials: true,
           signal: ac.signal,
         });
-
         const normalized = (data?.myProperties || []).map((p) => ({
           id: p.id,
           name: p.title || "Untitled",
@@ -103,10 +102,10 @@ function OwnerProperties() {
               <div className="flex-grow-1">
                 <h5 className="mb-1">{p.name}</h5>
                 <div className="text-muted small">
-                  {p.type} ・ ${p.price}/night
-                  {p.bedrooms != null && ` ・ ${p.bedrooms} bd`}
-                  {p.bathrooms != null && ` ・ ${p.bathrooms} ba`}
-                  {p.locationText && ` ・ ${p.locationText}`}
+                  {p.type} · ${p.price}/night
+                  {p.bedrooms != null && ` · ${p.bedrooms} bd`}
+                  {p.bathrooms != null && ` · ${p.bathrooms} ba`}
+                  {p.locationText && ` · ${p.locationText}`}
                 </div>
                 {!!p.amenities?.length && (
                   <div className="text-muted small mt-1">
@@ -130,3 +129,4 @@ function OwnerProperties() {
 }
 
 export default OwnerProperties;
+

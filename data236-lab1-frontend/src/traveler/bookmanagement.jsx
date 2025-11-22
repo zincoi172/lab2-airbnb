@@ -65,7 +65,7 @@ export default function BookingRequest() {
         const p = await res.json();
 
         const normalized = {
-          id: p.id,
+          id: p._id || p.id,  // ← FIXED: Try _id first, then fallback to id
           name: p.title || "Untitled",
           price: p.price_per_night != null ? Number(p.price_per_night) : 0,
           image: toFirstImage(p.photo_urls),
@@ -89,7 +89,6 @@ export default function BookingRequest() {
       alert("Check-out must be after check-in.");
       return;
     }
-
     const res = await dispatch(
       createBooking({
         property_id: Number(id),
